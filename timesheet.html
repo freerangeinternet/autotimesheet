@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semi-Monthly Time Sheet</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .timesheet-container, .custom-period-container {
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            height: 20px; /* Single height for header rows */
+        }
+        td {
+            height: 40px; /* Double the height for content rows */
+        }
+        .date-col {
+            width: 15%;
+            min-width: 100px; /* Ensures the column does not shrink below 100px */
+        }
+        .time-col {
+            width: 30%;
+            min-width: 150px; /* Ensures the column does not shrink below 150px */
+        }
+        .adjust-col {
+            width: 25%;
+            min-width: 125px; /* Ensures the column does not shrink below 125px */
+        }
+        .header, .footer {
+            margin: 20px 0;
+        }
+        .signature-line {
+            text-align: right;
+            padding-right: 20px;
+        }
+        .name-line {
+            text-align: center;
+            padding-top: 40px;
+        }
+        @media print {
+            html, body {
+                width: 8.5in;
+                height: 11in; /* Letter size */
+                display: block;
+            }
+            @page {
+                margin: 0;
+                size: A4 portrait; /* Modify to landscape if necessary */
+            }
+            table {
+                page-break-inside: avoid;
+                transform: scale(0.9); /* Scale the table to fit A4 size if necessary */
+                transform-origin: top center;
+            }
+            .print-hide {
+                display: none;
+            }
+            .header, .footer {
+                display: block;
+            }
+            .signature-line {
+                position: fixed;
+                bottom: 30px;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="timesheet-container">
+    <div class="period-selector-container print-hide">
+        <label for="periodSelector">Select Payroll Period:</label>
+        <select id="periodSelector" onchange="handlePeriodChange(this.value)">
+            <!-- Options will be populated by JavaScript -->
+        </select>
+        <button onclick="handlePrint();">Print</button>
+    </div>
+    <div class="custom-period-container print-hide" style="display:none;">
+        <label for="customStartDate">Start Date:</label>
+        <input type="date" id="customStartDate">
+        <label for="customEndDate">End Date:</label>
+        <input type="date" id="customEndDate">
+        <button onclick="setCustomPeriod();">Set Custom Period</button>
+    </div>
+    <div class="header">
+        <div class="footer print-hide">
+            <div class="name-line">
+                ___________________________________
+            </div>
+        </div>
+    </div>
+    <div id="payrollPeriod" class="header" style="text-align:center; margin-top:-10px;">
+        Payroll Period: <span id="selectedPeriod">[Select a period]</span>
+    </div>
+    <table id="timesheet">
+        <tr>
+            <th class="date-col">Date</th>
+            <th class="time-col">Time In</th>
+            <th class="time-col">Time Out</th>
+            <th class="adjust-col">Adjustment</th>
+        </tr>
+        <!-- Rows will be populated by JavaScript -->
+    </table>
+    <div class="footer print-hide">
+        <div class="signature-line">
+            <strong>Signature:</strong> ______________________________
+        </div>
+    </div>
+</div>
+<script>
+    function getPayrollPeriods() {
+        const periods = [];
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth();
+
+        // Previous period
+        if (today.getDate() <= 15) {
+            // Current is first half, previous is last month's second half
+            periods.push({
+                label: 'Previous Period (16 - End of Last Month)',
+                startDate: new Date(currentYear, currentMonth - 1, 16),
+                endDate: new Date(currentYear, currentMonth, 0)
+            });
+        } else {
+            // Current is second half, previous is this month's first half
+            periods.push({
+                label: 'Previous Period (1 - 15 of This Month)',
+                startDate: new Date(currentYear, currentMonth, 1),
+                endDate: new Date(currentYear, currentMonth, 15)
+            });
+        }
+
+        // Current period
+        if (today.getDate() <= 15) {
+            // First half of the month
+            periods.push({
+                label: 'Current Period (1 - 15 of This Month)',
+                startDate: new Date(currentYear, currentMonth, 1),
+                endDate: new Date(currentYear, currentMonth, 15),
+                selected: true // Select this period by default
+            });
+        } else {
+            // Second half of the month
+            periods.push({
+                label: 'Current Period (16 - End of This Month)',
+                startDate: new Date(currentYear, currentMonth, 16),
+                endDate: new Date(currentYear, currentMonth + 1, 0),
+                selected: true // Select this period by default
+            });
+        }
+
+        // Next period
+        if (today.getDate() <= 15) {
+            // Current is first half, next is this month's second half
+            periods.push({
+                label: 'Next Period (16 - End of This Month)',
+                startDate: new Date(currentYear, currentMonth, 16),
+                endDate: new Date(currentYear, currentMonth + 1, 0)
+            });
+        } else {
+            // Current is second half, next is next month's first half
+            periods.push({
+                label: 'Next Period (1 - 15 of Next Month)',
+                startDate: new Date(currentYear, currentMonth + 1, 1),
+                endDate: new Date(currentYear, currentMonth + 1, 15)
+            });
+        }
+
+        // Add custom period option
+        periods.push({ label: 'Custom Period', startDate: null, endDate: null });
+
+        return periods;
+    }
+
+    function generatePeriodOptions() {
+        const periodSelector = document.getElementById('periodSelector');
+        const periods = getPayrollPeriods();
+        periodSelector.innerHTML = ''; // Clear existing options
+
+        periods.forEach((period, index) => {
+            const option = document.createElement('option');
+            option.textContent = period.label;
+            option.value = index;
+            if (period.selected) {
+                option.selected = true;
+            }
+            periodSelector.appendChild(option);
+        });
+    }
+
+    function handlePeriodChange(index) {
+        const periods = getPayrollPeriods();
+        const period = periods[index];
+        if (period.startDate === null) { // Custom period selected
+            document.querySelector('.custom-period-container').style.display = 'block';
+        } else {
+            document.querySelector('.custom-period-container').style.display = 'none';
+            updateSelectedPeriod(period.startDate, period.endDate);
+        }
+    }
+
+    function setCustomPeriod() {
+        const startDate = document.getElementById('customStartDate').valueAsDate;
+        const endDate = document.getElementById('customEndDate').valueAsDate;
+        if (startDate && endDate && startDate <= endDate) {
+            updateSelectedPeriod(startDate, endDate);
+        } else {
+            alert('Please enter a valid start and end date where start date is not after end date.');
+        }
+    }
+
+    function updateSelectedPeriod(startDate, endDate) {
+        document.getElementById('selectedPeriod').textContent = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+        populateDates(startDate, endDate);
+    }
+
+    function populateDates(startDate, endDate) {
+        const timesheet = document.getElementById('timesheet');
+        timesheet.innerHTML = '<tr><th class="date-col">Date</th><th class="time-col">Time In</th><th class="time-col">Time Out</th><th class="adjust-col">Adjustment</th></tr>';
+        for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
+            const day = date.toDateString().split(' ')[0];
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${date.getMonth()+1}/${date.getDate()}\n${day}</td><td contenteditable></td><td contenteditable></td><td contenteditable></td>`;
+            timesheet.appendChild(tr);
+        }
+    }
+
+    window.onload = function() {
+        generatePeriodOptions();
+        const currentPeriodIndex = document.getElementById('periodSelector').value;
+        handlePeriodChange(currentPeriodIndex);
+    };
+
+    function handlePrint() {
+        window.print();
+    }
+</script>
+</body>
+</html>
