@@ -69,7 +69,7 @@
                 transform-origin: top center;
             }
             .print-hide {
-                display: none;
+                display: none !important;
             }
             .header, .footer {
                 display: block;
@@ -99,7 +99,7 @@
         <button onclick="setCustomPeriod();">Set Custom Period</button>
     </div>
     <div class="header">
-        <div class="footer print-hide">
+        <div class="footer">
             <div class="name-line">
                 ___________________________________
             </div>
@@ -117,7 +117,7 @@
         </tr>
         <!-- Rows will be populated by JavaScript -->
     </table>
-    <div class="footer print-hide">
+    <div class="footer">
         <div class="signature-line">
             <strong>Signature:</strong> ______________________________
         </div>
@@ -234,13 +234,22 @@
     function populateDates(startDate, endDate) {
         const timesheet = document.getElementById('timesheet');
         timesheet.innerHTML = '<tr><th class="date-col">Date</th><th class="time-col">Time In</th><th class="time-col">Time Out</th><th class="adjust-col">Adjustment</th></tr>';
-        for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
-            const day = date.toDateString().split(' ')[0];
+
+        for (let date = new Date(startDate); date <= new Date(endDate); date.setDate(date.getDate() + 1)) {
+            const dateString = date.toLocaleDateString(undefined, {
+                day: 'numeric',
+                month: 'numeric'
+            }); // Localized date string e.g., "4/1" in US or "1/4" in many parts of Europe
+            const dayString = date.toLocaleString(undefined, {
+                weekday: 'short'
+            }); // Localized short day name e.g., "Mon" in US or "Lun" in Italy
+
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${date.getMonth()+1}/${date.getDate()}\n${day}</td><td contenteditable></td><td contenteditable></td><td contenteditable></td>`;
+            tr.innerHTML = `<td contenteditable="">${dateString}\n${dayString}</td><td contenteditable></td><td contenteditable></td><td contenteditable></td>`;
             timesheet.appendChild(tr);
         }
     }
+
 
     window.onload = function() {
         generatePeriodOptions();
